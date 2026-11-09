@@ -1,0 +1,38 @@
+# Production (EC2). Images come from GitHub Container Registry.
+# OWNER, AWS_REGION and SNS_TOPIC_ARN are exported by the pipeline's deploy step.
+# AWS credentials come from the EC2 instance's IAM role (no keys anywhere).
+
+x-cloudwatch-logs: &cloudwatch-logs
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION}
+    awslogs-group: microshop
+    awslogs-create-group: "true"
+    tag: "{{.Name}}"          # one log stream per container
+
+services:
+  product-service:
+    image: ghcr.io/${OWNER}/microshop-product-service:latest
+    environment:
+      AWS_REGION: ${AWS_REGION}
+      PRODUCTS_TABLE: microshop-products
+    logging: *cloudwatch-logs
+    restart: unless-stopped
+
+  order-service:
+    image: ghcr.io/${OWNER}/microshop-order-service:latest
+    environment:
+      AWS_REGION: ${AWS_REGION}
+      ORDERS_TABLE: microshop-orders
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN}
+      PRODUCT_SERVICE_URL: http://product-service:5001
+    depends_on: [product-service]
+    logging: *cloudwatch-logs
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/${OWNER}/microshop-frontend:latest
+    ports: ["80:80"]
+    depends_on: [product-service, order-service]
+    logging: *cloudwatch-logs
+    restart: unless-stopped

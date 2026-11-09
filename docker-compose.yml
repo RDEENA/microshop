@@ -1,0 +1,28 @@
+# Local development (optional). Builds from source and talks to your real AWS tables.
+# Before running, export AWS credentials in your shell (for Learner Lab, copy them
+# from "AWS Details" -> AWS CLI), plus AWS_REGION and optionally SNS_TOPIC_ARN.
+#   docker compose up --build      then open http://localhost:8080
+x-aws-env: &aws-env
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+
+services:
+  product-service:
+    build: ./product-service
+    environment:
+      <<: *aws-env
+      PRODUCTS_TABLE: microshop-products
+  order-service:
+    build: ./order-service
+    environment:
+      <<: *aws-env
+      ORDERS_TABLE: microshop-orders
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
+      PRODUCT_SERVICE_URL: http://product-service:5001
+    depends_on: [product-service]
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [product-service, order-service]

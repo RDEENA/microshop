@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MicroShop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EEF4F2; --surface: #FFFFFF; --ink: #13302B; --muted: #587A73;
+    --line: #CFE0DB; --accent: #0F7B6C; --accent-ink: #FFFFFF;
+    --ok: #179A57; --down: #C8443B; --strip: #13302B; --strip-ink: #DDF2EC;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1E1B; --surface: #152A26; --ink: #E3F1ED; --muted: #8FB2AA;
+      --line: #24423C; --accent: #3FC2AC; --accent-ink: #0E1E1B;
+      --ok: #4AD48B; --down: #FF7B70; --strip: #07120F; --strip-ink: #BFE6DC;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 "Source Sans 3", system-ui, sans-serif; }
+
+  /* The memorable element: a live deployment strip proving which commit is running */
+  .deploy {
+    background: var(--strip); color: var(--strip-ink);
+    padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: .92rem;
+  }
+  .svc { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 30%, transparent); }
+  .dot.down { background: var(--down); }
+  .ver { font-family: ui-monospace, Menlo, Consolas, monospace; background: rgba(255,255,255,.1); padding: 1px 7px; border-radius: 5px; }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 44px 20px 72px; }
+  h1, h2, h3 { font-family: "Archivo", "Source Sans 3", sans-serif; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 6vw, 3.2rem); font-weight: 800; letter-spacing: -0.02em; }
+  .lede { color: var(--muted); margin: 8px 0 32px; max-width: 60ch; }
+  h2 { font-size: 1.3rem; margin-bottom: 14px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .product { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .product h3 { font-size: 1.08rem; font-weight: 700; }
+  .price { font: 700 1.4rem "Archivo", sans-serif; }
+  .stock { color: var(--muted); font-size: .92rem; }
+  .stock.low { color: var(--down); }
+  .buy { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; }
+  .buy input { width: 64px; padding: 8px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  button { font: 600 .98rem "Source Sans 3", sans-serif; border: 0; border-radius: 8px; padding: 9px 14px; background: var(--accent); color: var(--accent-ink); cursor: pointer; flex: 1; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .msg { min-height: 1.5em; margin: 14px 0 0; font-weight: 600; }
+  .msg.ok { color: var(--ok); } .msg.err { color: var(--down); }
+
+  section.orders { margin-top: 48px; }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: .9rem; }
+  tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--muted); text-align: center; padding: 26px; }
+</style>
+</head>
+<body>
+  <div class="deploy" aria-live="polite">
+    <div class="svc"><span class="dot" id="dot-product"></span>product-service <span class="ver" id="ver-product">…</span></div>
+    <div class="svc"><span class="dot" id="dot-order"></span>order-service <span class="ver" id="ver-order">…</span></div>
+  </div>
+
+  <main>
+    <h1>MicroShop</h1>
+    <p class="lede">A small store split into independent services. Products and orders run in separate containers and are stored in Amazon DynamoDB. Every push to GitHub redeploys them automatically.</p>
+
+    <section>
+      <h2>Products</h2>
+      <div class="grid" id="products"></div>
+      <p class="msg" id="msg" role="status"></p>
+    </section>
+
+    <section class="orders">
+      <h2>Recent orders</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Placed</th></tr></thead>
+          <tbody id="orders"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+<script>
+  const P = "/api/product-service", O = "/api/order-service";
+  const $ = (id) => document.getElementById(id);
+  const inr = (n) => "₹" + n.toLocaleString("en-IN");
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  async function health(url, key) {
+    try {
+      const r = await fetch(url + "/health");
+      const d = await r.json();
+      $("dot-" + key).className = "dot up";
+      $("ver-" + key).textContent = d.version === "dev" ? "dev" : d.version.slice(0, 7);
+    } catch {
+      $("dot-" + key).className = "dot down";
+      $("ver-" + key).textContent = "offline";
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      const list = await (await fetch(P + "/products")).json();
+      $("products").innerHTML = list.map(p => `
+        <article class="product">
+          <h3>${esc(p.name)}</h3>
+          <div class="price">${inr(p.price)}</div>
+          <div class="stock ${p.stock <= 3 ? "low" : ""}">${p.stock > 0 ? p.stock + " in stock" : "Out of stock"}</div>
+          <div class="buy">
+            <input type="number" min="1" max="${p.stock}" value="1" id="qty-${p.id}" aria-label="Quantity of ${esc(p.name)}">
+            <button onclick="order(${p.id})" ${p.stock === 0 ? "disabled" : ""}>Place order</button>
+          </div>
+        </article>`).join("");
+    } catch {
+      $("products").innerHTML = `<p class="msg err">Product service isn’t responding. Check that its container is running.</p>`;
+    }
+  }
+
+  async function loadOrders() {
+    try {
+      const list = await (await fetch(O + "/orders")).json();
+      $("orders").innerHTML = list.length ? list.map(o => `
+        <tr><td>${esc(o.id)}</td><td>${esc(o.product_name)}</td><td>${o.quantity}</td>
+        <td>${inr(o.total)}</td><td>${new Date(o.created_at * 1000).toLocaleTimeString()}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">No orders yet. Place one above.</td></tr>`;
+    } catch {
+      $("orders").innerHTML = `<tr><td colspan="5" class="empty">Order service isn’t responding.</td></tr>`;
+    }
+  }
+
+  async function order(id) {
+    const quantity = parseInt($("qty-" + id).value, 10);
+    try {
+      const r = await fetch(O + "/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: id, quantity })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Order failed");
+      $("msg").className = "msg ok";
+      $("msg").textContent = `Order #${d.id} placed: ${d.quantity} × ${d.product_name} for ${inr(d.total)}` + (d.notified ? ". Email notification sent." : "");
+    } catch (e) {
+      $("msg").className = "msg err";
+      $("msg").textContent = "Order not placed: " + e.message;
+    }
+    loadProducts(); loadOrders();
+  }
+
+  health(P, "product"); health(O, "order");
+  loadProducts(); loadOrders();
+  setInterval(() => { health(P, "product"); health(O, "order"); }, 10000);
+</script>
+</body>
+</html>
