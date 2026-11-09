@@ -23,6 +23,7 @@ SEED_PRODUCTS = [
     {"id": 2, "name": "Raspberry Pi 5", "price": 7800, "stock": 5},
     {"id": 3, "name": "USB-C Hub", "price": 1499, "stock": 20},
     {"id": 4, "name": "Mechanical Keyboard", "price": 3299, "stock": 8},
+    {"id": 5, "name": "Wireless Mouse", "price": 899, "stock": 15},
 ]
 
 
