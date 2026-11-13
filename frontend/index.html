@@ -9,80 +9,126 @@
 <style>
   :root {
     --bg: #EEF4F2; --surface: #FFFFFF; --ink: #13302B; --muted: #587A73;
-    --line: #CFE0DB; --accent: #0F7B6C; --accent-ink: #FFFFFF;
-    --ok: #179A57; --down: #C8443B; --strip: #13302B; --strip-ink: #DDF2EC;
+    --line: #CFE0DB; --accent: #0F7B6C; --accent-ink: #FFFFFF; --soft: #E1EFEB;
+    --ok: #179A57; --warn: #C98A12; --down: #C8443B; --strip: #13302B; --strip-ink: #DDF2EC;
+    --flash: #FFF3C4;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0E1E1B; --surface: #152A26; --ink: #E3F1ED; --muted: #8FB2AA;
-      --line: #24423C; --accent: #3FC2AC; --accent-ink: #0E1E1B;
-      --ok: #4AD48B; --down: #FF7B70; --strip: #07120F; --strip-ink: #BFE6DC;
+      --line: #24423C; --accent: #3FC2AC; --accent-ink: #0E1E1B; --soft: #1C3631;
+      --ok: #4AD48B; --warn: #F0B54A; --down: #FF7B70; --strip: #07120F; --strip-ink: #BFE6DC;
+      --flash: #3B3518;
       color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 "Source Sans 3", system-ui, sans-serif; }
 
-  /* The memorable element: a live deployment strip proving which commit is running */
-  .deploy {
-    background: var(--strip); color: var(--strip-ink);
-    padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: .92rem;
-  }
+  /* ---------- live deployment / health strip ---------- */
+  .deploy { background: var(--strip); color: var(--strip-ink); padding: 10px 20px;
+            display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: .92rem; align-items: center; }
   .svc { display: flex; align-items: center; gap: 8px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 30%, transparent); }
+  .dot.slow { background: var(--warn); }
   .dot.down { background: var(--down); }
   .ver { font-family: ui-monospace, Menlo, Consolas, monospace; background: rgba(255,255,255,.1); padding: 1px 7px; border-radius: 5px; }
+  .ms { opacity: .8; }
+  .deploy .live { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .switch input { accent-color: var(--ok); width: 16px; height: 16px; }
 
-  main { max-width: 1000px; margin: 0 auto; padding: 44px 20px 72px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 72px; }
   h1, h2, h3 { font-family: "Archivo", "Source Sans 3", sans-serif; margin: 0; }
   h1 { font-size: clamp(2.2rem, 6vw, 3.2rem); font-weight: 800; letter-spacing: -0.02em; }
-  .lede { color: var(--muted); margin: 8px 0 32px; max-width: 60ch; }
+  .lede { color: var(--muted); margin: 8px 0 26px; max-width: 62ch; }
   h2 { font-size: 1.3rem; margin-bottom: 14px; }
 
+  /* ---------- dashboard stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 36px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .stat .num { font: 800 1.9rem/1.1 "Archivo", sans-serif; }
+  .stat .label { color: var(--muted); font-size: .92rem; margin-top: 4px; }
+  .stat.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .stat.accent .label { color: inherit; opacity: .85; }
+
+  /* ---------- products ---------- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-  .product { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .product { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px;
+             display: flex; flex-direction: column; gap: 6px; }
   .product h3 { font-size: 1.08rem; font-weight: 700; }
   .price { font: 700 1.4rem "Archivo", sans-serif; }
   .stock { color: var(--muted); font-size: .92rem; }
-  .stock.low { color: var(--down); }
+  .stock.low { color: var(--down); font-weight: 600; }
+  .meter { height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .meter span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+  .meter span.low { background: var(--down); }
   .buy { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; }
   .buy input { width: 64px; padding: 8px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-  button { font: 600 .98rem "Source Sans 3", sans-serif; border: 0; border-radius: 8px; padding: 9px 14px; background: var(--accent); color: var(--accent-ink); cursor: pointer; flex: 1; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
+  button { font: 600 .98rem "Source Sans 3", sans-serif; border: 0; border-radius: 8px; padding: 9px 14px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; flex: 1; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  button.ghost { background: var(--soft); color: var(--ink); flex: none; }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-  .msg { min-height: 1.5em; margin: 14px 0 0; font-weight: 600; }
-  .msg.ok { color: var(--ok); } .msg.err { color: var(--down); }
-
-  section.orders { margin-top: 48px; }
+  /* ---------- orders ---------- */
+  section.orders { margin-top: 44px; }
+  .orders-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .updated { color: var(--muted); font-size: .9rem; }
   .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; font-size: .9rem; }
   tr:last-child td { border-bottom: 0; }
+  tr.new td { animation: flash 3s ease-out; }
+  @keyframes flash { from { background: var(--flash); } to { background: transparent; } }
   .empty { color: var(--muted); text-align: center; padding: 26px; }
+
+  /* ---------- toasts ---------- */
+  .toasts { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 10px; z-index: 10; max-width: min(380px, 90vw); }
+  .toast { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left-width: 1px;
+           border-radius: 12px; padding: 12px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.18);
+           display: flex; gap: 10px; align-items: flex-start; animation: rise .25s ease-out; }
+  .toast .icon { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center;
+                 font-weight: 700; font-size: .8rem; color: #fff; background: var(--ok); }
+  .toast.err .icon { background: var(--down); }
+  @keyframes rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .toast, tr.new td { animation: none; } .meter span { transition: none; } }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
-  <div class="deploy" aria-live="polite">
-    <div class="svc"><span class="dot" id="dot-product"></span>product-service <span class="ver" id="ver-product">…</span></div>
-    <div class="svc"><span class="dot" id="dot-order"></span>order-service <span class="ver" id="ver-order">…</span></div>
+  <div class="deploy">
+    <div class="svc"><span class="dot" id="dot-product"></span>product-service <span class="ver" id="ver-product">…</span> <span class="ms" id="ms-product"></span></div>
+    <div class="svc"><span class="dot" id="dot-order"></span>order-service <span class="ver" id="ver-order">…</span> <span class="ms" id="ms-order"></span></div>
+    <div class="live">
+      <label class="switch"><input type="checkbox" id="auto" checked> Live updates</label>
+    </div>
   </div>
 
   <main>
     <h1>MicroShop</h1>
     <p class="lede">A small store split into independent services. Products and orders run in separate containers and are stored in Amazon DynamoDB. Every push to GitHub redeploys them automatically.</p>
 
+    <section class="stats" aria-label="Store dashboard">
+      <div class="stat accent"><div class="num" id="s-orders">–</div><div class="label">Recent orders</div></div>
+      <div class="stat"><div class="num" id="s-revenue">–</div><div class="label">Revenue from recent orders</div></div>
+      <div class="stat"><div class="num" id="s-stock">–</div><div class="label">Items left in stock</div></div>
+      <div class="stat"><div class="num" id="s-low">–</div><div class="label">Products running low</div></div>
+    </section>
+
     <section>
       <h2>Products</h2>
       <div class="grid" id="products"></div>
-      <p class="msg" id="msg" role="status"></p>
     </section>
 
     <section class="orders">
-      <h2>Recent orders</h2>
+      <div class="orders-head">
+        <h2>Recent orders</h2>
+        <span class="updated" id="updated">Loading…</span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Placed</th></tr></thead>
@@ -92,56 +138,118 @@
     </section>
   </main>
 
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
 <script>
   const P = "/api/product-service", O = "/api/order-service";
+  const REFRESH_MS = 10000, SLOW_MS = 500, LOW_STOCK = 3;
   const $ = (id) => document.getElementById(id);
-  const inr = (n) => "₹" + n.toLocaleString("en-IN");
+  const inr = (n) => "₹" + Number(n).toLocaleString("en-IN");
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+  let products = [], orders = [], knownOrderIds = null, busy = new Set();
+
+  /* ---------- toasts ---------- */
+  function toast(msg, kind = "ok") {
+    const el = document.createElement("div");
+    el.className = "toast" + (kind === "err" ? " err" : "");
+    el.innerHTML = `<span class="icon" aria-hidden="true">${kind === "err" ? "!" : "✓"}</span><span>${esc(msg)}</span>`;
+    $("toasts").appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+
+  /* ---------- health + response time ---------- */
   async function health(url, key) {
+    const t0 = performance.now();
     try {
-      const r = await fetch(url + "/health");
+      const r = await fetch(url + "/health", { cache: "no-store" });
       const d = await r.json();
-      $("dot-" + key).className = "dot up";
+      const ms = Math.round(performance.now() - t0);
+      $("dot-" + key).className = "dot " + (ms > SLOW_MS ? "slow" : "up");
       $("ver-" + key).textContent = d.version === "dev" ? "dev" : d.version.slice(0, 7);
+      $("ms-" + key).textContent = `· ${ms} ms`;
     } catch {
       $("dot-" + key).className = "dot down";
       $("ver-" + key).textContent = "offline";
+      $("ms-" + key).textContent = "";
     }
   }
 
+  /* ---------- products ---------- */
   async function loadProducts() {
     try {
-      const list = await (await fetch(P + "/products")).json();
-      $("products").innerHTML = list.map(p => `
-        <article class="product">
-          <h3>${esc(p.name)}</h3>
-          <div class="price">${inr(p.price)}</div>
-          <div class="stock ${p.stock <= 3 ? "low" : ""}">${p.stock > 0 ? p.stock + " in stock" : "Out of stock"}</div>
-          <div class="buy">
-            <input type="number" min="1" max="${p.stock}" value="1" id="qty-${p.id}" aria-label="Quantity of ${esc(p.name)}">
-            <button onclick="order(${p.id})" ${p.stock === 0 ? "disabled" : ""}>Place order</button>
-          </div>
-        </article>`).join("");
+      products = await (await fetch(P + "/products", { cache: "no-store" })).json();
+      renderProducts();
     } catch {
-      $("products").innerHTML = `<p class="msg err">Product service isn’t responding. Check that its container is running.</p>`;
+      products = [];
+      $("products").innerHTML = `<p class="stock low">Product service isn’t responding. Its container may be restarting.</p>`;
     }
   }
 
+  function renderProducts() {
+    // keep quantities the user has typed, and don't redraw while they are typing
+    const active = document.activeElement;
+    if (active && active.id && active.id.startsWith("qty-")) return;
+    const typed = {};
+    document.querySelectorAll("[id^=qty-]").forEach(i => typed[i.id] = i.value);
+    const maxStock = Math.max(1, ...products.map(p => p.stock));
+    $("products").innerHTML = products.map(p => {
+      const low = p.stock <= LOW_STOCK;
+      const qty = Math.min(Math.max(1, parseInt(typed["qty-" + p.id] || "1", 10)), Math.max(1, p.stock));
+      return `
+      <article class="product">
+        <h3>${esc(p.name)}</h3>
+        <div class="price">${inr(p.price)}</div>
+        <div class="stock ${low ? "low" : ""}">${p.stock > 0 ? p.stock + " in stock" + (low ? " · running low" : "") : "Out of stock"}</div>
+        <div class="meter" aria-hidden="true"><span class="${low ? "low" : ""}" style="width:${Math.round(p.stock / maxStock * 100)}%"></span></div>
+        <div class="buy">
+          <input type="number" min="1" max="${p.stock}" value="${qty}" id="qty-${p.id}" aria-label="Quantity of ${esc(p.name)}" ${p.stock === 0 ? "disabled" : ""}>
+          <button onclick="order(${p.id})" id="btn-${p.id}" ${p.stock === 0 || busy.has(p.id) ? "disabled" : ""}>${busy.has(p.id) ? "Placing…" : "Place order"}</button>
+        </div>
+      </article>`;
+    }).join("");
+  }
+
+  /* ---------- orders ---------- */
   async function loadOrders() {
     try {
-      const list = await (await fetch(O + "/orders")).json();
-      $("orders").innerHTML = list.length ? list.map(o => `
-        <tr><td>${esc(o.id)}</td><td>${esc(o.product_name)}</td><td>${o.quantity}</td>
-        <td>${inr(o.total)}</td><td>${new Date(o.created_at * 1000).toLocaleTimeString()}</td></tr>`).join("")
+      orders = await (await fetch(O + "/orders", { cache: "no-store" })).json();
+      const ids = new Set(orders.map(o => o.id));
+      const fresh = knownOrderIds ? orders.filter(o => !knownOrderIds.has(o.id)) : [];
+      knownOrderIds = ids;
+      $("orders").innerHTML = orders.length ? orders.map(o => `
+        <tr class="${fresh.some(f => f.id === o.id) ? "new" : ""}">
+          <td>${esc(o.id)}</td><td>${esc(o.product_name)}</td><td>${o.quantity}</td>
+          <td>${inr(o.total)}</td><td>${new Date(o.created_at * 1000).toLocaleTimeString()}</td></tr>`).join("")
         : `<tr><td colspan="5" class="empty">No orders yet. Place one above.</td></tr>`;
+      return fresh;
     } catch {
+      orders = [];
       $("orders").innerHTML = `<tr><td colspan="5" class="empty">Order service isn’t responding.</td></tr>`;
+      return [];
     }
   }
 
+  /* ---------- dashboard ---------- */
+  function renderStats() {
+    $("s-orders").textContent = orders.length;
+    $("s-revenue").textContent = inr(orders.reduce((s, o) => s + o.total, 0));
+    $("s-stock").textContent = products.reduce((s, p) => s + p.stock, 0);
+    $("s-low").textContent = products.filter(p => p.stock <= LOW_STOCK).length;
+  }
+
+  async function refresh({ announce = false } = {}) {
+    await Promise.all([health(P, "product"), health(O, "order"), loadProducts()]);
+    const fresh = await loadOrders();
+    renderStats();
+    $("updated").textContent = "Last updated " + new Date().toLocaleTimeString();
+    if (announce) fresh.forEach(o => toast(`New order from another device: ${o.quantity} × ${o.product_name}`));
+  }
+
+  /* ---------- place an order ---------- */
   async function order(id) {
     const quantity = parseInt($("qty-" + id).value, 10);
+    busy.add(id); renderProducts();
     try {
       const r = await fetch(O + "/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -149,18 +257,30 @@
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Order failed");
-      $("msg").className = "msg ok";
-      $("msg").textContent = `Order #${d.id} placed: ${d.quantity} × ${d.product_name} for ${inr(d.total)}` + (d.notified ? ". Email notification sent." : "");
+      knownOrderIds && knownOrderIds.add(d.id);   // don't announce our own order as "from another device"
+      toast(`Order #${d.id} placed: ${d.quantity} × ${d.product_name} for ${inr(d.total)}` + (d.notified ? ". Email sent." : ""));
+      await refresh();
+      // highlight our own new row too
+      const row = [...$("orders").rows].find(tr => tr.cells[0] && tr.cells[0].textContent === d.id);
+      if (row) row.classList.add("new");
     } catch (e) {
-      $("msg").className = "msg err";
-      $("msg").textContent = "Order not placed: " + e.message;
+      toast("Order not placed: " + e.message, "err");
+      busy.delete(id); renderProducts();
+      return;
     }
-    loadProducts(); loadOrders();
+    busy.delete(id); renderProducts();
   }
 
-  health(P, "product"); health(O, "order");
-  loadProducts(); loadOrders();
-  setInterval(() => { health(P, "product"); health(O, "order"); }, 10000);
+  /* ---------- live updates ---------- */
+  let timer = null;
+  function setLive(on) {
+    clearInterval(timer);
+    if (on) timer = setInterval(() => { if (!document.hidden) refresh({ announce: true }); }, REFRESH_MS);
+  }
+  $("auto").addEventListener("change", e => setLive(e.target.checked));
+
+  refresh();
+  setLive(true);
 </script>
 </body>
 </html>
